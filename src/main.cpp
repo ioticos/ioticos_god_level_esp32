@@ -10,7 +10,7 @@
 #include <PubSubClient.h>
 
 String dId = "121212";
-String webhook_pass = "SA7sxAKDV";
+String webhook_pass = "SA7sxAKDVR";
 String webhook_endpoint = "http://192.168.0.6:3001/api/getdevicecredentials";
 const char* mqtt_server = "192.168.0.6";
 
@@ -24,6 +24,8 @@ const char *wifi_password = "Tesla208";
 //Functions definitions
 bool get_mqtt_credentials();
 void clear();
+
+DynamicJsonDocument mqtt_data_doc(2048);
 
 void setup() {
 
@@ -102,10 +104,23 @@ bool get_mqtt_credentials(){
     String responseBody = http.getString();
 
     Serial.print(boldGreen + "\n\n         Mqtt Credentials Obtained Successfully :) " + fontReset);
-    Serial.print("\n\n" + responseBody);
-    delay(2000);
+    
+    deserializeJson(mqtt_data_doc, responseBody);
+    http.end();
+    delay(1000);
+    
+
+    //String mqtt_username = mqtt_data_doc["username"];
+    //String mqtt_password = mqtt_data_doc["password"];
+    //int freq  = mqtt_data_doc["variables"][1]["variableSendFreq"];
+//
+    //Serial.println(mqtt_username);
+    //Serial.println(mqtt_password);
+    //Serial.println(freq);
 
   }
+
+  return false;
 
 }
 
