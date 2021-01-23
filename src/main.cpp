@@ -18,12 +18,19 @@ const char* mqtt_server = "192.168.0.6";
 #define led 2
 
 //WiFi
-const char *wifi_ssid = "GOLD2";
-const char *wifi_password = "Tesla208";
+const char* wifi_ssid = "GOLD2";
+const char* wifi_password = "Tesla208";
 
 //Functions definitions
 bool get_mqtt_credentials();
+void check_mqtt_connection();
+bool reconnect();
 void clear();
+
+//Global Vars
+WiFiClient  espclient;
+PubSubClient client(espclient);
+long lastReconnectAttemp = 0;
 
 DynamicJsonDocument mqtt_data_doc(2048);
 
@@ -63,16 +70,64 @@ void setup() {
   Serial.println(fontReset);
 
 
-  get_mqtt_credentials();
-
-
 }
 
 void loop() {
-
+  check_mqtt_connection();
+  
 }
 
 
+
+bool reconnect(){
+
+  if (!get_mqtt_credentials()){
+    Serial.println(boldRed + "\n\n      Error getting mqtt credentials :( \n\n RESTARTING IN 10 SECONDS");
+    Serial.println(fontReset);
+    delay(10000);
+    ESP.restart();
+  }
+
+  //Setting up Mqtt Server
+  client.setServer(mqtt_server, 1883);
+
+  Serial.print(underlinePurple + "\n\n\nTrying MQTT Connection" + fontReset + Purple + "  ⤵");
+
+  String str_client_id = "device_" + dId + "_" + random(1,9999);
+  const char* username = mqtt_data_doc["username"];
+  const char* password = mqtt_data_doc["password"];
+  String str_topic = mqtt_data_doc["topic"];
+
+  if(client.connect(str_client_id.c_str(), username, password)){
+    Serial.print(boldGreen + "\n\n         Mqtt Client Connected :) " + fontReset);
+    delay(2000);
+
+    client.subscribe((str_topic + "+/actdata").c_str());
+  }else{
+    Serial.print(boldRed + "\n\n         Mqtt Client Connection Failed :( " + fontReset);
+  }
+
+
+}
+
+void check_mqtt_connection(){
+  
+  if(!client.connected()){
+    
+    long now = millis();
+
+    if (now - lastReconnectAttemp > 5000){
+      lastReconnectAttemp = millis();
+       if(reconnect()){
+         lastReconnectAttemp = 0;
+       }
+    }
+
+  }else{
+    client.loop();
+  }
+
+}
 
 bool get_mqtt_credentials(){
 
@@ -109,21 +164,11 @@ bool get_mqtt_credentials(){
     http.end();
     delay(1000);
     
-
-    //String mqtt_username = mqtt_data_doc["username"];
-    //String mqtt_password = mqtt_data_doc["password"];
-    //int freq  = mqtt_data_doc["variables"][1]["variableSendFreq"];
-//
-    //Serial.println(mqtt_username);
-    //Serial.println(mqtt_password);
-    //Serial.println(freq);
-
   }
 
-  return false;
+  return true;
 
 }
-
 
 void clear()
 {
