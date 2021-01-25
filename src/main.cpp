@@ -81,21 +81,19 @@ void loop()
   check_mqtt_connection();
   send_data_to_broker();
 
-  process_sensors();
-  process_actuators();
-
 }
 
 
 int prev_temp = 0;
 int prev_hum = 0;
+
 void process_sensors(){
 
 
   //get temp simulation
   int temp = random(1, 100);
   mqtt_data_doc["variables"][0]["last"]["value"] = temp;
-
+  
 
   //save temp?
   int dif = temp - prev_temp;
@@ -127,6 +125,10 @@ void process_sensors(){
   }
 
   prev_hum = hum;
+
+
+  //get led status
+  mqtt_data_doc["variables"][4]["last"]["value"] = (HIGH == digitalRead(led));
 
 
 
@@ -169,6 +171,9 @@ void send_data_to_broker(){
       serializeJson(mqtt_data_doc["variables"][i]["last"], toSend);
 
       client.publish(topic.c_str(), toSend.c_str());
+
+      Serial.println(topic);
+      Serial.println(toSend);
 
 
     }
@@ -241,6 +246,8 @@ void check_mqtt_connection()
   else
   {
     client.loop();
+    process_sensors();
+    process_actuators();
   }
 }
 
