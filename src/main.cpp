@@ -25,6 +25,8 @@ const char *wifi_password = "Tesla208";
 bool get_mqtt_credentials();
 void check_mqtt_connection();
 bool reconnect();
+void process_sensors();
+void process_actuators();
 void clear();
 
 //Global Vars
@@ -76,7 +78,70 @@ void setup()
 void loop()
 {
   check_mqtt_connection();
+
+  process_sensors();
+  process_actuators();
+
+  delay(5000);
+  serializeJsonPretty(mqtt_data_doc, Serial);
 }
+
+
+int prev_temp = 0;
+int prev_hum = 0;
+
+
+void process_sensors(){
+
+
+  //get temp simulation
+  int temp = random(1, 100);
+  mqtt_data_doc["variables"][0]["last"]["value"] = temp;
+
+
+  //save temp?
+  int dif = temp - prev_temp;
+  if (dif < 0) {dif *= -1;}
+
+  if (dif >= 40) {
+    mqtt_data_doc["variables"][0]["last"]["save"] = 1;
+  }else{
+    mqtt_data_doc["variables"][0]["last"]["save"] = 0;
+  }
+
+  prev_temp = temp;
+
+
+
+
+  //get humidity simulation
+  int hum = random (1, 50);
+  mqtt_data_doc["variables"][1]["last"]["value"] = hum;
+
+    //save hum?
+  dif = hum - prev_hum;
+  if (dif < 0) {dif *= -1;}
+
+  if (dif >= 20) {
+    mqtt_data_doc["variables"][1]["last"]["save"] = 1;
+  }else{
+    mqtt_data_doc["variables"][1]["last"]["save"] = 0;
+  }
+
+  prev_hum = hum;
+
+
+
+}
+
+void process_actuators(){
+  if (mqtt_data_doc["variables"][2]["last"]["value"] == true){
+    digitalWrite(led, HIGH);
+  }else if(mqtt_data_doc["variables"][2]["last"]["value"] == false){
+    digitalWrite(led, LOW);
+  }
+}
+
 
 bool reconnect()
 {
