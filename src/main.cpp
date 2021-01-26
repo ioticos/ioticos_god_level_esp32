@@ -27,13 +27,15 @@ void check_mqtt_connection();
 bool reconnect();
 void process_sensors();
 void process_actuators();
-void send_data_to_broker(); 
-void callback(char* topic, byte* payload, unsigned int length);
+void send_data_to_broker();
+void callback(char *topic, byte *payload, unsigned int length);
+void process_incoming_msg(String topic, String incoming);
 void clear();
 
 //Global Vars
 WiFiClient espclient;
 PubSubClient client(espclient);
+IoTicosSplitter splitter;
 long lastReconnectAttemp = 0;
 
 DynamicJsonDocument mqtt_data_doc(2048);
@@ -75,112 +77,183 @@ void setup()
   Serial.print(boldBlue);
   Serial.print(WiFi.localIP());
   Serial.println(fontReset);
-  
+
   client.setCallback(callback);
-  
 }
 
 void loop()
 {
   check_mqtt_connection();
-  
-
 }
-
 
 int prev_temp = 0;
 int prev_hum = 0;
 
-void process_sensors(){
-
+void process_sensors()
+{
 
   //get temp simulation
   int temp = random(1, 100);
   mqtt_data_doc["variables"][0]["last"]["value"] = temp;
-  
 
   //save temp?
   int dif = temp - prev_temp;
-  if (dif < 0) {dif *= -1;}
+  if (dif < 0)
+  {
+    dif *= -1;
+  }
 
-  if (dif >= 40) {
+  if (dif >= 40)
+  {
     mqtt_data_doc["variables"][0]["last"]["save"] = 1;
-  }else{
+  }
+  else
+  {
     mqtt_data_doc["variables"][0]["last"]["save"] = 0;
   }
 
   prev_temp = temp;
 
-
-
-
   //get humidity simulation
-  int hum = random (1, 50);
+  int hum = random(1, 50);
   mqtt_data_doc["variables"][1]["last"]["value"] = hum;
 
-    //save hum?
+  //save hum?
   dif = hum - prev_hum;
-  if (dif < 0) {dif *= -1;}
+  if (dif < 0)
+  {
+    dif *= -1;
+  }
 
-  if (dif >= 20) {
+  if (dif >= 20)
+  {
     mqtt_data_doc["variables"][1]["last"]["save"] = 1;
-  }else{
+  }
+  else
+  {
     mqtt_data_doc["variables"][1]["last"]["save"] = 0;
   }
 
   prev_hum = hum;
 
-
   //get led status
   mqtt_data_doc["variables"][4]["last"]["value"] = (HIGH == digitalRead(led));
-
-
-
 }
 
-void process_actuators(){
-  if (mqtt_data_doc["variables"][2]["last"]["value"] == true){
+void process_actuators()
+{
+  if (mqtt_data_doc["variables"][2]["last"]["value"] == true)
+  {
     digitalWrite(led, HIGH);
-  }else if(mqtt_data_doc["variables"][2]["last"]["value"] == false){
+  }
+  else if (mqtt_data_doc["variables"][2]["last"]["value"] == false)
+  {
     digitalWrite(led, LOW);
   }
 }
 
+String last_received_msg = "";
+String last_received_topic = "";
 
+/*
+username: 'YMhQjLSTDK',
+  password: 'QeNP4Yh9hl',
+  topic: '5ffcc00149fdcf311a4de607/121212/',
+  variables: [
+    {
+      variable: 'UN09CeSTtk',
+      variableFullName: 'Temperature',
+      variableType: 'input',
+      variableSendFreq: 10,
+      last: "{}"
+    },
+    {
+      variable: 'LqSbjUs1el',
+      variableFullName: 'Humidity',
+      variableType: 'input',
+      variableSendFreq: 3
+    },
+    {
+      variable: 'EB2hR2QpII',
+      variableFullName: 'Light',
+      variableType: 'output',
+      variableSendFreq: undefined
+    },
+    {
+      variable: '3CTkjlSaxa',
+      variableFullName: 'Light',
+      variableType: 'output',
+      variableSendFreq: undefined
+      last: 
+    },
+    {
+      variable: 'DHJcvXTK0D',
+      variableFullName: 'Light Status',
+      variableType: 'input',
+      variableSendFreq: '10'
+    }
+  ]
+*/
+
+
+// sdfgsdfgsdfg/121212/3CTkjlSaxa/actdata
 //TEMPLATE ⤵
-void callback(char* topic, byte* payload, unsigned int length){
-   
-   String incoming = "";
+void process_incoming_msg(String topic, String incoming){
 
-   for (int i = 0; i < length; i++){
-     incoming += (char)payload[i] ;
-   }
+  last_received_topic = topic;
+  last_received_msg = incoming;
 
-   incoming.trim();
+  String variable = splitter.split(topic, '/', 2);
 
-    process_incoming_msg(String(topic), incoming);
+  for (int i = 0; i < mqtt_data_doc["variables"].size(); i++ ){
 
-    Serial.println(incoming);
-    Serial.println(String(topic));
+    if (mqtt_data_doc["variables"][i]["variable"] == variable){
+      
+      DynamicJsonDocument doc(256);
+      deserializeJson(doc, incoming);
+      mqtt_data_doc["variables"][i]["last"] = doc;
 
+    }
+
+  }
+
+}
+
+void callback(char *topic, byte *payload, unsigned int length)
+{
+
+  String incoming = "";
+
+  for (int i = 0; i < length; i++)
+  {
+    incoming += (char)payload[i];
+  }
+
+  incoming.trim();
+
+  process_incoming_msg(String(topic), incoming);
 
 }
 
 long varsLastSend[20];
 
-void send_data_to_broker(){
+void send_data_to_broker()
+{
 
   long now = millis();
 
-  for(int i = 0; i < mqtt_data_doc["variables"].size(); i++){
+  for (int i = 0; i < mqtt_data_doc["variables"].size(); i++)
+  {
 
-    if (mqtt_data_doc["variables"][i]["variableType"] == "output"){
+    if (mqtt_data_doc["variables"][i]["variableType"] == "output")
+    {
       continue;
     }
 
     int freq = mqtt_data_doc["variables"][i]["variableSendFreq"];
 
-    if (now - varsLastSend[i] > freq * 1000){
+    if (now - varsLastSend[i] > freq * 1000)
+    {
       varsLastSend[i] = millis();
 
       String str_root_topic = mqtt_data_doc["topic"];
@@ -195,14 +268,8 @@ void send_data_to_broker(){
 
       Serial.println(topic);
       Serial.println(toSend);
-
-
     }
-    
-
-
   }
-
 }
 
 bool reconnect()
