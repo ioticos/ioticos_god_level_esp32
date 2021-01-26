@@ -83,7 +83,7 @@ void setup()
 void loop()
 {
   check_mqtt_connection();
-  send_data_to_broker();
+  
 
 }
 
@@ -158,7 +158,7 @@ void callback(char* topic, byte* payload, unsigned int length){
 
    incoming.trim();
 
-    //process_incoming_msg(String(topic), incoming);
+    process_incoming_msg(String(topic), incoming);
 
     Serial.println(incoming);
     Serial.println(String(topic));
@@ -269,6 +269,7 @@ void check_mqtt_connection()
     client.loop();
     process_sensors();
     process_actuators();
+    send_data_to_broker();
   }
 }
 
