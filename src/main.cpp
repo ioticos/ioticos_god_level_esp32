@@ -37,6 +37,7 @@ WiFiClient espclient;
 PubSubClient client(espclient);
 IoTicosSplitter splitter;
 long lastReconnectAttemp = 0;
+long varsLastSend[20];
 
 DynamicJsonDocument mqtt_data_doc(2048);
 
@@ -142,58 +143,25 @@ void process_sensors()
 
 void process_actuators()
 {
-  if (mqtt_data_doc["variables"][2]["last"]["value"] == true)
+  if (mqtt_data_doc["variables"][2]["last"]["value"] == "true")
   {
     digitalWrite(led, HIGH);
+    mqtt_data_doc["variables"][2]["last"]["value"] = "";
+    varsLastSend[4] = 0;
   }
-  else if (mqtt_data_doc["variables"][2]["last"]["value"] == false)
+  else if (mqtt_data_doc["variables"][3]["last"]["value"] == "false")
   {
     digitalWrite(led, LOW);
+    mqtt_data_doc["variables"][3]["last"]["value"] = "";
+    varsLastSend[4] = 0;
   }
+
 }
 
 String last_received_msg = "";
 String last_received_topic = "";
 
-/*
-username: 'YMhQjLSTDK',
-  password: 'QeNP4Yh9hl',
-  topic: '5ffcc00149fdcf311a4de607/121212/',
-  variables: [
-    {
-      variable: 'UN09CeSTtk',
-      variableFullName: 'Temperature',
-      variableType: 'input',
-      variableSendFreq: 10,
-      last: "{}"
-    },
-    {
-      variable: 'LqSbjUs1el',
-      variableFullName: 'Humidity',
-      variableType: 'input',
-      variableSendFreq: 3
-    },
-    {
-      variable: 'EB2hR2QpII',
-      variableFullName: 'Light',
-      variableType: 'output',
-      variableSendFreq: undefined
-    },
-    {
-      variable: '3CTkjlSaxa',
-      variableFullName: 'Light',
-      variableType: 'output',
-      variableSendFreq: undefined
-      last: 
-    },
-    {
-      variable: 'DHJcvXTK0D',
-      variableFullName: 'Light Status',
-      variableType: 'input',
-      variableSendFreq: '10'
-    }
-  ]
-*/
+
 
 
 // sdfgsdfgsdfg/121212/3CTkjlSaxa/actdata
@@ -217,6 +185,8 @@ void process_incoming_msg(String topic, String incoming){
 
   }
 
+  process_actuators();
+
 }
 
 void callback(char *topic, byte *payload, unsigned int length)
@@ -235,7 +205,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
 }
 
-long varsLastSend[20];
+
 
 void send_data_to_broker()
 {
@@ -335,7 +305,6 @@ void check_mqtt_connection()
   {
     client.loop();
     process_sensors();
-    process_actuators();
     send_data_to_broker();
   }
 }
