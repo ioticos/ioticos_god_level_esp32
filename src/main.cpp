@@ -27,16 +27,14 @@ void check_mqtt_connection();
 bool reconnect();
 void process_sensors();
 void process_actuators();
-void send_data_to_broker();
-void callback(char *topic, byte *payload, unsigned int length);
-void process_incoming_msg(String topic , String incoming);
+void send_data_to_broker(); 
+void callback(char* topic, byte* payload, unsigned int length);
 void clear();
 
 //Global Vars
 WiFiClient espclient;
 PubSubClient client(espclient);
 long lastReconnectAttemp = 0;
-IoTicosSplitter splitter;
 
 DynamicJsonDocument mqtt_data_doc(2048);
 
@@ -77,16 +75,15 @@ void setup()
   Serial.print(boldBlue);
   Serial.print(WiFi.localIP());
   Serial.println(fontReset);
-
+  
   client.setCallback(callback);
-
- 
+  
 }
 
 void loop()
 {
   check_mqtt_connection();
-  
+  send_data_to_broker();
 
 }
 
@@ -151,45 +148,22 @@ void process_actuators(){
 
 
 //TEMPLATE ⤵
-void process_incoming_msg(String topic , String incoming){
-  
-  // topic: userid/did/var/
-  //abcde
-  String variable = splitter.split(topic, '/', 2);
+void callback(char* topic, byte* payload, unsigned int length){
+   
+   String incoming = "";
 
-  for (int i = 0; i < mqtt_data_doc["variables"].size(); i++)
-  {
-    
-    if(mqtt_data_doc["variables"][i]["variable"] == variable){
-     
-     
-      DynamicJsonDocument doc(256);
-      deserializeJson(doc,incoming);
-      mqtt_data_doc["variables"][i]["last"]["value"] = doc["value"];
+   for (int i = 0; i < length; i++){
+     incoming += (char)payload[i] ;
+   }
 
-      serializeJsonPretty(mqtt_data_doc, Serial);
+   incoming.trim();
 
-      process_actuators();
+    //process_incoming_msg(String(topic), incoming);
 
-    }
-
-  }
+    Serial.println(incoming);
+    Serial.println(String(topic));
 
 
-
-}
-
-void callback(char *topic, byte *payload, unsigned int length){
-
-  String incoming = "";
-
-  for (int i = 0; i < length; i++){
-    incoming += (char)payload[i];
-  }
-
-  incoming.trim();
-
-  process_incoming_msg(String(topic), incoming);
 }
 
 long varsLastSend[20];
@@ -295,7 +269,6 @@ void check_mqtt_connection()
     client.loop();
     process_sensors();
     process_actuators();
-    send_data_to_broker();
   }
 }
 
