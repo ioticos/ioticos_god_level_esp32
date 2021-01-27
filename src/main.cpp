@@ -30,6 +30,7 @@ void process_actuators();
 void send_data_to_broker();
 void callback(char *topic, byte *payload, unsigned int length);
 void process_incoming_msg(String topic, String incoming);
+void print_stats();
 void clear();
 
 //Global Vars
@@ -38,6 +39,10 @@ PubSubClient client(espclient);
 IoTicosSplitter splitter;
 long lastReconnectAttemp = 0;
 long varsLastSend[20];
+String last_received_msg = "";
+String last_received_topic = "";
+int prev_temp = 0;
+int prev_hum = 0;
 
 DynamicJsonDocument mqtt_data_doc(2048);
 
@@ -80,16 +85,18 @@ void setup()
   Serial.println(fontReset);
 
   client.setCallback(callback);
+
 }
 
 void loop()
 {
   check_mqtt_connection();
+  
 }
 
-int prev_temp = 0;
-int prev_hum = 0;
 
+
+//USER FUNTIONS ⤵
 void process_sensors()
 {
 
@@ -158,13 +165,9 @@ void process_actuators()
 
 }
 
-String last_received_msg = "";
-String last_received_topic = "";
 
 
 
-
-// sdfgsdfgsdfg/121212/3CTkjlSaxa/actdata
 //TEMPLATE ⤵
 void process_incoming_msg(String topic, String incoming){
 
@@ -180,6 +183,10 @@ void process_incoming_msg(String topic, String incoming){
       DynamicJsonDocument doc(256);
       deserializeJson(doc, incoming);
       mqtt_data_doc["variables"][i]["last"] = doc;
+
+      long counter = mqtt_data_doc["variables"][i]["counter"];
+      counter++;
+      mqtt_data_doc["variables"][i]["counter"] = counter;
 
     }
 
@@ -204,8 +211,6 @@ void callback(char *topic, byte *payload, unsigned int length)
   process_incoming_msg(String(topic), incoming);
 
 }
-
-
 
 void send_data_to_broker()
 {
@@ -236,8 +241,12 @@ void send_data_to_broker()
 
       client.publish(topic.c_str(), toSend.c_str());
 
-      Serial.println(topic);
-      Serial.println(toSend);
+
+      //STATS
+      long counter = mqtt_data_doc["variables"][i]["counter"];
+      counter++;
+      mqtt_data_doc["variables"][i]["counter"] = counter;
+
     }
   }
 }
@@ -306,6 +315,7 @@ void check_mqtt_connection()
     client.loop();
     process_sensors();
     send_data_to_broker();
+    print_stats();
   }
 }
 
@@ -357,4 +367,42 @@ void clear()
   Serial.print("[2J"); // clear screen command
   Serial.write(27);
   Serial.print("[H"); // cursor to home command
+}
+
+long lastStats = 0;
+
+void print_stats()
+{
+  long now = millis();
+
+  if (now - lastStats > 2000)
+  {
+    lastStats = millis();
+    clear();
+
+    Serial.print("\n");
+    Serial.print(Purple + "\n╔══════════════════════════╗" + fontReset);
+    Serial.print(Purple + "\n║       SYSTEM STATS       ║" + fontReset);
+    Serial.print(Purple + "\n╚══════════════════════════╝" + fontReset);
+    Serial.print("\n\n");
+    Serial.print("\n\n");
+
+    Serial.print(boldCyan + "#" + " \t Name" + " \t\t Var" + " \t\t Type" + " \t\t Count" + " \t\t Last V" + fontReset + "\n\n");
+
+    for (int i = 0; i < mqtt_data_doc["variables"].size(); i++)
+    {
+
+      String variableFullName = mqtt_data_doc["variables"][i]["variableFullName"];
+      String variable = mqtt_data_doc["variables"][i]["variable"];
+      String variableType = mqtt_data_doc["variables"][i]["variableType"];
+      String lastMsg = mqtt_data_doc["variables"][i]["last"];
+      long counter = mqtt_data_doc["variables"][i]["counter"];
+
+      Serial.println(String(i) + " \t " + variableFullName.substring(0,5) + " \t\t " + variable.substring(0,10) + " \t " + variableType.substring(0,5) + " \t\t " + String(counter).substring(0,10) + " \t\t " + lastMsg);
+    }
+
+    Serial.print(boldGreen + "\n\n Free RAM -> " + fontReset + ESP.getFreeHeap() + " Bytes");
+
+    Serial.print(boldGreen + "\n\n Last Incomming Msg -> " + fontReset + last_received_msg);
+  }
 }
